@@ -20,14 +20,14 @@ repository=https://github.com/GlownyUrzadGeodezjiIKartografii/mapa_glebowo_rolni
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-changelog=
-Wersja 1.0.2
+  changelog=
+  Wersja 1.0.2
   * utworzenie narzędzia do wizualizacji mapy glebowo rolniczej w formacie GML
 
 # Tags are comma separated with spaces allowed
 tags=python
 
-homepage=http://homepage
+homepage=https://www.geoportal.gov.pl/pl/dane/mapy/
 category=Plugins
 icon=icon.png
 # experimental flag
