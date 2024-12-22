@@ -4,7 +4,7 @@
 
 [general]
 name=Mapa Glebowo-Rolnicza
-qgisMinimumVersion=3.0
+qgisMinimumVersion=3.22
 description=Wtyczka do wizualizacji mapy glebowo rolniczej
 version=1.0.2
 author=GUGiK
@@ -12,15 +12,17 @@ email=marcin.lebiecki@gugik.gov.pl
 
 about=Wtyczka do wizualizacji mapy glebowo rolniczej
 
-tracker=http://bugs
-repository=http://repo
+tracker=https://github.com/GlownyUrzadGeodezjiIKartografii/mapa_glebowo_rolnicza/issues
+repository=https://github.com/GlownyUrzadGeodezjiIKartografii/mapa_glebowo_rolnicza
 # End of mandatory metadata
 
 # Recommended items:
 
 hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=
+Wersja 1.0.2
+  * utworzenie narzędzia do wizualizacji mapy glebowo rolniczej w formacie GML
 
 # Tags are comma separated with spaces allowed
 tags=python
@@ -29,7 +31,7 @@ homepage=http://homepage
 category=Plugins
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
