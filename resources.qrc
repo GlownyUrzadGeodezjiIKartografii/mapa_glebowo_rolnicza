@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/mapa_glebowo_rolnicza" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
