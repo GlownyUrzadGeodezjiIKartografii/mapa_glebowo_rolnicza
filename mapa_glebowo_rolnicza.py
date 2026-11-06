@@ -24,9 +24,7 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
-
-# Initialize Qt resources from file resources.py
-from .resources import *
+from .constants import MAIN_ICON
 # Import the code for the dialog
 from .mapa_glebowo_rolnicza_dialog import MapaGlebowoRolniczaDialog
 import os.path
@@ -160,7 +158,7 @@ class MapaGlebowoRolnicza:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ':/plugins/mapa_glebowo_rolnicza/icon.png'
+        icon_path = os.path.join(self.plugin_dir, MAIN_ICON)
         self.add_action(
             icon_path,
             text=self.tr(u'Mapa Glebowo-Rolnicza'),
@@ -191,7 +189,7 @@ class MapaGlebowoRolnicza:
 
         # show the dialog
         self.dlg.show()
-        result = self.dlg.exec_()
+        result = self.dlg.exec()
         if result:
             # no logic behind this
             pass

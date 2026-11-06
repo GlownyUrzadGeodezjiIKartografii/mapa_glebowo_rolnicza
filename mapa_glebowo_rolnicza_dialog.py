@@ -26,12 +26,14 @@
 import os
 import datetime
 
+from qgis.core import QgsSettings
 from qgis.PyQt import uic, QtWidgets
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QFileDialog, QApplication
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtWidgets import QFileDialog, QApplication, QMessageBox
 from .validation_service import ValidationService
 from .display_service import DisplayService
-from .constants import DEFAULT_COLOR, RED_COLOR, SCHEMA_GML, MAIN_ICON, DOWNLOAD_ICON, VALIDATION_ERROR_INFO, OK_INFO, PROCESSING_INFO, LOAD_ERROR_INFO, DOTS_INFO
+from .schema_detector import detect_schema_version, UnsupportedSchemaError
+from .constants import DEFAULT_COLOR, RED_COLOR, MAIN_ICON, DOWNLOAD_ICON, VALIDATION_ERROR_INFO, OK_INFO, PROCESSING_INFO, LOAD_ERROR_INFO, DOTS_INFO, LAST_VECTOR_DIR_KEY
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -61,8 +63,8 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
         self.kontury_gml_path = None
         self.odkrywki_errors = None
         self.kontury_errors = None
-
-        self.schema= os.path.join(self.plugin_dir, "schema", SCHEMA_GML)
+        self.odkrywki_schema_version = None
+        self.kontury_schema_version = None
 
         icon = QIcon(os.path.join(self.plugin_dir, DOWNLOAD_ICON))
         self.pushButtonKonturyErrors.setIcon(icon)
@@ -81,6 +83,21 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
         self.__kontury_controls_default()
         self.__odkrywki_controls_default()
 
+    def __last_gml_dir(self):
+        """Return the last directory used for loading vector layers in QGIS
+        (shared with the Data Source Manager), or "" when unknown/invalid."""
+
+        last_dir = QgsSettings().value(LAST_VECTOR_DIR_KEY, "")
+        if last_dir and os.path.isdir(last_dir):
+            return last_dir
+        return ""
+
+    def __remember_gml_dir(self, file_name):
+        """Store the directory of the selected GML file into the same QGIS
+        setting the Data Source Manager uses, keeping both in sync."""
+
+        QgsSettings().setValue(LAST_VECTOR_DIR_KEY, os.path.dirname(file_name))
+
     def on_select_odkrywki_gml(self):
         """On select odkrywki gml file event handler"""
 
@@ -88,8 +105,9 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
         QApplication.processEvents()
 
         options = QFileDialog.Options()
-        fileName, _ = QFileDialog.getOpenFileName(self,"QFileDialog.getOpenFileName()", "","All Files (*.gml *.xml)", options=options)
+        fileName, _ = QFileDialog.getOpenFileName(self,"QFileDialog.getOpenFileName()", self.__last_gml_dir(),"All Files (*.gml *.xml)", options=options)
         if fileName:
+            self.__remember_gml_dir(fileName) # sync last dir with Data Source Manager
             self.odkrywki_gml_path = fileName # save file path
             base_name = os.path.basename(fileName)
             self.labelOdkrywkiOpenResult.setText(base_name) # show file name
@@ -99,8 +117,20 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
             self.progressBarOdkrywkiValidation.setValue(0)
             QApplication.processEvents()
 
+            # auto-detect schema version from the gml namespace
+            schema_version = self.__detect_schema_version(self.odkrywki_gml_path)
+            if schema_version is None:
+                self.odkrywki_errors = {}
+                self.__validation_odkrywki_controls_error()
+                return
+            self.odkrywki_schema_version = schema_version
+
             # validate
-            validation_result, errors = self.validation_service.validate_odkrywki_with_schema(self.odkrywki_gml_path, self.schema, self.progressBarOdkrywkiValidation)
+            validation_result, errors = self.validation_service.validate_odkrywki_with_schema(
+                self.odkrywki_gml_path,
+                self.__schema_path(schema_version),
+                self.progressBarOdkrywkiValidation,
+                schema_version.namespaces())
             self.odkrywki_errors = errors
 
             # show validation result
@@ -141,8 +171,9 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
         QApplication.processEvents()
 
         options = QFileDialog.Options()
-        fileName, _ = QFileDialog.getOpenFileName(self,"QFileDialog.getOpenFileName()", "","All Files (*.gml *.xml)", options=options)
+        fileName, _ = QFileDialog.getOpenFileName(self,"QFileDialog.getOpenFileName()", self.__last_gml_dir(),"All Files (*.gml *.xml)", options=options)
         if fileName:
+            self.__remember_gml_dir(fileName) # sync last dir with Data Source Manager
             self.kontury_gml_path = fileName # save file path
             base_name = os.path.basename(fileName)
             self.labelKonturyOpenResult.setText(base_name) # show file name
@@ -152,8 +183,20 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
             self.progressBarKonturyValidation.setValue(0)
             QApplication.processEvents()
 
+            # auto-detect schema version from the gml namespace
+            schema_version = self.__detect_schema_version(self.kontury_gml_path)
+            if schema_version is None:
+                self.kontury_errors = {}
+                self.__validation_kontury_controls_error()
+                return
+            self.kontury_schema_version = schema_version
+
             # validate
-            validation_result, errors = self.validation_service.validate_kontury_with_schema(self.kontury_gml_path, self.schema, self.progressBarKonturyValidation)
+            validation_result, errors = self.validation_service.validate_kontury_with_schema(
+                self.kontury_gml_path,
+                self.__schema_path(schema_version),
+                self.progressBarKonturyValidation,
+                schema_version.namespaces())
             self.kontury_errors = errors
 
             # show validation result
@@ -171,7 +214,7 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
         self.progressBarKonturyLoad.setValue(0)
 
         # load
-        load_result = self.display_service.display_kontury(self.kontury_gml_path, self.progressBarKonturyLoad)
+        load_result = self.display_service.display_kontury(self.kontury_gml_path, self.progressBarKonturyLoad, self.kontury_schema_version)
 
         # show load result
         if load_result:
@@ -192,11 +235,30 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
         if file_path:
             self.validation_service.save_errors_to_file(self.kontury_errors, file_path)
 
+    def __detect_schema_version(self, gml_path):
+        """Detect the schema version, or show an error and return None."""
+
+        try:
+            return detect_schema_version(gml_path)
+        except UnsupportedSchemaError as ex:
+            QMessageBox.critical(None, VALIDATION_ERROR_INFO, str(ex))
+            return None
+        except Exception as ex:
+            QMessageBox.critical(None, VALIDATION_ERROR_INFO, "Nie udało się otworzyć pliku gml")
+            print(ex)
+            return None
+
+    def __schema_path(self, schema_version):
+        """Resolve the XSD path for a detected schema version."""
+
+        return os.path.join(self.plugin_dir, "schema", schema_version.xsd_filename)
+
     def __kontury_controls_default(self):
         """Set default values for kontury controls."""
 
         self.kontury_gml_path = None
         self.kontury_errors = None
+        self.kontury_schema_version = None
 
         self.labelKonturyOpenResult.setText("")
         self.labelKonturyValidateResult.setText(DOTS_INFO)
@@ -244,6 +306,7 @@ class MapaGlebowoRolniczaDialog(QtWidgets.QDialog, FORM_CLASS):
 
         self.odkrywki_gml_path = None
         self.odkrywki_errors = None
+        self.odkrywki_schema_version = None
 
         self.labelOdkrywkiOpenResult.setText("")
         self.labelOdkrywkiValidateResult.setText(DOTS_INFO)

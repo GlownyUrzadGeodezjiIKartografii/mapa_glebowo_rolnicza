@@ -1,0 +1,7 @@
+[bandit]
+# Vendored third-party libraries (xmlschema 4.3.2, elementpath 5.1.4).
+# Upstream code, not modified here. No known vulnerabilities reported by
+# pip-audit for these versions (checked 2026-11-03).
+# A glob, not plain "libs": Bandit rewrites a value that is an existing directory
+# relative to the cwd, and the exclusion then stops matching absolute paths.
+exclude = */libs/*
